@@ -189,7 +189,7 @@ static bool ParseNDEFMessage(void)
 /*
 * adcconv.c
 /* Set pins function */
-*/
+
 #include <string.h>
 #include <stdlib.h>
 #include "board.h"
@@ -226,56 +226,59 @@ static void I2D_Init(){
 }
 
 float get_ADCconv(){
-float res;
-float vss_input = 3300;
+    float res;
+    float vss_input = 3300;
 
-//Input voltage
-/** output in μV = ((native value - native offset) * internal operating voltage / steps per μV) + offset
-* native offset = 2048
-* internal voltage = 1.2V
-* gain (steps per μV) = 2730
-* offset = 0.9V **/
+    //Input voltage
+    /** output in μV = ((native value - native offset) * internal operating voltage / steps per μV) + offset
+    * native offset = 2048
+    * internal voltage = 1.2V
+    * gain (steps per μV) = 2730
+    * offset = 0.9V **/
 
-float r_0_kohm = 10000; //Pull-up Resistor
-int ref_r_0 = 10000;
-int ref_r_1 = 10000;
-// calibrate Voltage reference
-ADC_REF_Init();
-Chip_ADCDAC_StartADC(NSS_ADCDAC0);
-while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
-; /* Wait until measurement completes. For single-shot mode only! */
+    float r_0_kohm = 10000; //Pull-up Resistor
+    int ref_r_0 = 10000;
+    int ref_r_1 = 10000;
+    // calibrate Voltage reference
+    ADC_REF_Init();
+    Chip_ADCDAC_StartADC(NSS_ADCDAC0);
+    while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
+    ; /* Wait until measurement completes. For single-shot mode only! */    }
+
+    adcInput = (((float)((Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) - 2048))*1.2) / 2730 + 0.9);
+    vss_input = ((float)(ref_r_1 + ref_r_0)/(float)(ref_r_1)) * adcInput;
+    ADC_Init();
+    Chip_ADCDAC_StartADC(NSS_ADCDAC0);
+
+    while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
+    ; /* Wait until measurement completes. For single-shot mode only! */    }
+
+    adcInput = (((float)((Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) - 2048))*1.2) / 2730 + 0.9);
+    res = ((float)r_0_kohm * adcInput)/ ((float)vss_input - adcInput);
+    return res;
 }
-adcInput = (((float)((Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) - 2048))*1.2) / 2730 + 0.9);
-vss_input = ((float)(ref_r_1 + ref_r_0)/(float)(ref_r_1)) * adcInput;
-ADC_Init();
-Chip_ADCDAC_StartADC(NSS_ADCDAC0);
-while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
-; /* Wait until measurement completes. For single-shot mode only! */
-}
-adcInput = (((float)((Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) - 2048))*1.2) / 2730 + 0.9);
-res = ((float)r_0_kohm * adcInput)/ ((float)vss_input - adcInput);
-return res;
-}
+
 float get_ADCconv_I2D(){
-int i2dValue;
-int i2dNativeValue;
-float res;
-// Chip_ADCDAC_StartDAC(NSS_ADCDAC0);
-Chip_ADCDAC_StartADC(NSS_ADCDAC0);
-while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
-; /* Wait until measurement completes. For single-shot mode only! */
-}
-adcInput = ((float)Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) * 1600) / 4096;
-Chip_ADCDAC_DeInit(NSS_ADCDAC0);
-Chip_I2D_Start(NSS_I2D);
-while (!(Chip_I2D_ReadStatus(NSS_I2D) & I2D_STATUS_CONVERSION_DONE)) {
-; /* wait */
-}
-i2dNativeValue = Chip_I2D_GetValue(NSS_I2D);
-i2dValue = Chip_I2D_NativeToPicoAmpere(i2dNativeValue, I2D_SCALER_GAIN_100_1, I2D_CONVERTER_GAIN_LOW, 100);
-// Chip_ADCDAC_StopDAC(NSS_ADCDAC0);
-// Chip_ADCDAC_DeInit(NSS_ADCDAC0);
-// Chip_I2D_DeInit(NSS_I2D);
-res = (adcInput / (float)i2dValue) * 1000000000;
-return res;
+    int i2dValue;
+    int i2dNativeValue;
+    float res;
+    // Chip_ADCDAC_StartDAC(NSS_ADCDAC0);
+    Chip_ADCDAC_StartADC(NSS_ADCDAC0);
+
+    while (!(Chip_ADCDAC_ReadStatus(NSS_ADCDAC0) & ADCDAC_STATUS_ADC_DONE)) {
+    ; /* Wait until measurement completes. For single-shot mode only! */ }
+    adcInput = ((float)Chip_ADCDAC_GetValueADC(NSS_ADCDAC0) * 1600) / 4096;
+    Chip_ADCDAC_DeInit(NSS_ADCDAC0);
+    Chip_I2D_Start(NSS_I2D);
+
+    while (!(Chip_I2D_ReadStatus(NSS_I2D) & I2D_STATUS_CONVERSION_DONE)) {
+    ; /* wait */ }
+
+    i2dNativeValue = Chip_I2D_GetValue(NSS_I2D);
+    i2dValue = Chip_I2D_NativeToPicoAmpere(i2dNativeValue, I2D_SCALER_GAIN_100_1, I2D_CONVERTER_GAIN_LOW, 100);
+    // Chip_ADCDAC_StopDAC(NSS_ADCDAC0);
+    // Chip_ADCDAC_DeInit(NSS_ADCDAC0);
+    // Chip_I2D_DeInit(NSS_I2D);
+    res = (adcInput / (float)i2dValue) * 1000000000;
+    return res;
 }
